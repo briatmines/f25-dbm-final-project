@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage: ./src/mk-recipies-csv.sh ./mc-assets/data/minecraft/recipie/ > ./mc-data/recipies.csv
+# Usage: ./src/mk-recipes-csv.sh ./mc-assets/data/minecraft/recipe/ > ./mc-data/recipes.csv
 
 cd "$1"
 
