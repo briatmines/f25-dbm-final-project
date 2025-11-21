@@ -1,0 +1,47 @@
+recipie
+  id           -- TEXT PRIMARY KEY
+  type         -- NOT NULL, enum for this
+  category     -- NULLABLE, TEXT REFERENCES category(id)
+  group        -- NULLABLE, TEXT REFERENCES group(id)
+  result_count -- NOT NULL, SHORTINTEGER (can't possibly be more than 64 (in vanilla))
+  result_id    -- NOT NULL TEXT REFERENCES item(id)
+
+  (maybe)
+  cooking_time -- double precision
+  experience_gained -- double precision
+
+  INDEX (type)
+  INDEX (category)
+  INDEX (group)
+  
+  INDEX (result_id) ?
+
+recipie_ingredient
+  position -- nullable
+  recipie  -- NOT NULL TEXT REFERENCES recipie(id)
+  item     -- NULLABLE TEXT REFERENCES item(id)
+  tag      -- NULLABLE TEXT REFERENCES tag(id)
+  CHECK ((tag IS NULL AND item IS NOT NULL) OR (tag IS NOT NULL and item IS NULL))
+  
+  INDEX (recipie)
+  INDEX (item)
+  INDEX (tag)
+
+item
+  id TEXT PRIMARY KEY
+
+tag
+  id TEXT PRIMARY KEY
+
+group
+  id TEXT PRIMARY KEY
+
+category
+  id TEXT PRIMARY KEY
+
+item_tag
+  item NOT NULL TEXT REFERENCES item(id)
+  tag  NOT NULL TEXT REFERENCES tag(id)
+  INDEX (item)
+  INDEX (tag)
+  PRIMARY KEY (item, tag)
