@@ -10,7 +10,7 @@ CREATE TABLE tags_json(name TEXT, json JSON);
 \copy tags_json from './mc-data/tags.csv' (FORMAT CSV);
 
 
-DROP TABLE IF EXISTS category;
+DROP TABLE IF EXISTS category CASCADE;
 CREATE TABLE category (id TEXT PRIMARY KEY);
 INSERT INTO category (
     SELECT id FROM (
@@ -19,7 +19,7 @@ INSERT INTO category (
     ) WHERE id IS NOT NULL
 );
 
-DROP TABLE IF EXISTS recipe_group;
+DROP TABLE IF EXISTS recipe_group CASCADE;
 CREATE TABLE recipe_group (id TEXT PRIMARY KEY);
 INSERT INTO recipe_group (
     SELECT id FROM (
@@ -28,7 +28,7 @@ INSERT INTO recipe_group (
     ) WHERE id IS NOT NULL
 );
 
-DROP TABLE IF EXISTS tag;
+DROP TABLE IF EXISTS tag CASCADE;
 CREATE TABLE tag (id TEXT PRIMARY KEY);
 INSERT INTO tag (
     SELECT name FROM tags_json
