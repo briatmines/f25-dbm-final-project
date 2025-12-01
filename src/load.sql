@@ -69,13 +69,13 @@ INSERT INTO item_tag (
 
 
   -- create recipe table
-DROP TABLE IF EXISTS recipe;
+DROP TABLE IF EXISTS recipe CASCADE;
 CREATE TABLE recipe (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
     category TEXT REFERENCES category(id),
     recipe_group TEXT REFERENCES recipe_group(id),
-    result_item TEXT,
+    result_item TEXT NOT NULL,
     result_count SMALLINT NOT NULL
 );
 INSERT INTO recipe (
@@ -97,4 +97,21 @@ INSERT INTO recipe (
       'minecraft:campfire_cooking',
       'minecraft:stonecutting'
     )
+);
+
+  -- create ingredient table
+DROP TABLE IF EXISTS recipe_ingredient;
+CREATE TABLE recipe_ingredient (
+    recipe TEXT NOT NULL REFERENCES recipe(id),
+    position SMALLINT,
+    item TEXT,
+    tag TEXT REFERENCES tag(id)
+);
+INSERT INTO recipe_ingredient (
+    SELECT name AS recipe, jt.*
+    FROM recipes_json, JSON_TABLE(json, '$.ingredients[*]' COLUMNS (
+        position FOR ORDINALITY,
+        item TEXT PATH '$'
+    )) as jt
+    WHERE json ->> 'type' = 'minecraft:crafting_shapeless'
 );

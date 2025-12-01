@@ -35,7 +35,7 @@ item
 tag
   id TEXT PRIMARY KEY
 
-group
+recipe_group
   id TEXT PRIMARY KEY
 
 category
