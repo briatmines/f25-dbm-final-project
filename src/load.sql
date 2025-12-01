@@ -35,7 +35,7 @@ INSERT INTO recipe_group (
 DROP TABLE IF EXISTS tag CASCADE;
 CREATE TABLE tag (id TEXT PRIMARY KEY);
 INSERT INTO tag (
-    SELECT name FROM tags_json
+    SELECT ('#' || name) FROM tags_json
 );
 
 
@@ -48,7 +48,7 @@ CREATE TABLE item_tag (
 );
 
 WITH RECURSIVE unexpanded_tags AS (
-    SELECT name AS tag, json_table.*
+    SELECT ('#' || name) AS tag, json_table.*
     FROM tags_json, JSON_TABLE (json, '$.values[*]' COLUMNS (
         item TEXT PATH '$'
     )) AS json_table
@@ -59,7 +59,7 @@ expanded_tags AS (
     UNION ALL
     SELECT base.tag, sub.item
     FROM expanded_tags base
-    JOIN unexpanded_tags sub ON base.item = ('#' || sub.tag)
+    JOIN unexpanded_tags sub ON base.item = sub.tag
 )
 INSERT INTO item_tag (
     SELECT DISTINCT item, tag
@@ -107,11 +107,20 @@ CREATE TABLE recipe_ingredient (
     item TEXT,
     tag TEXT REFERENCES tag(id)
 );
-INSERT INTO recipe_ingredient (
+WITH ingredient_intermediate AS (
     SELECT name AS recipe, jt.*
     FROM recipes_json, JSON_TABLE(json, '$.ingredients[*]' COLUMNS (
         position FOR ORDINALITY,
-        item TEXT PATH '$'
+        item_or_tag TEXT PATH '$'
     )) as jt
     WHERE json ->> 'type' = 'minecraft:crafting_shapeless'
+)
+INSERT INTO recipe_ingredient (
+    SELECT recipe, position, NULL, item_or_tag
+    FROM ingredient_intermediate
+    WHERE item_or_tag LIKE '#%'
+    UNION
+    SELECT recipe, position, item_or_tag, NULL
+    FROM ingredient_intermediate
+    WHERE item_or_tag NOT LIKE '#%'
 );
