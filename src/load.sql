@@ -105,7 +105,9 @@ CREATE TABLE recipe_ingredient (
     recipe TEXT NOT NULL REFERENCES recipe(id),
     position SMALLINT,
     item TEXT,
-    tag TEXT REFERENCES tag(id)
+    tag TEXT REFERENCES tag(id),
+    PRIMARY KEY (recipe, position),
+    CHECK ((item IS NOT NULL AND tag IS NULL) OR (item IS NULL AND tag IS NOT NULL))
 );
 WITH ingredient_intermediate AS (
     SELECT name AS recipe, jt.*
