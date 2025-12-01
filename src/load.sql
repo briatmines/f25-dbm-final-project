@@ -66,3 +66,35 @@ INSERT INTO item_tag (
     FROM expanded_tags
     WHERE item NOT LIKE '#%'
 );
+
+
+  -- create recipe table
+DROP TABLE IF EXISTS recipe;
+CREATE TABLE recipe (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    category TEXT REFERENCES category(id),
+    recipe_group TEXT REFERENCES recipe_group(id),
+    result_item TEXT,
+    result_count SMALLINT NOT NULL
+);
+INSERT INTO recipe (
+    SELECT name AS id, jt.*
+    FROM recipes_json, JSON_TABLE(json, '$' COLUMNS (
+        type TEXT PATH '$.type',
+        category TEXT PATH '$.category',
+        recipe_group TEXT PATH '$.group',
+        result_item TEXT PATH '$.result.id',
+        result_count SMALLINT PATH '$.result.count' DEFAULT 1 ON EMPTY
+    )) AS jt
+    WHERE type IN (
+      'minecraft:crafting_shaped',
+      'minecraft:crafting_shapeless',
+      'minecraft:crafting_transmute',
+      'minecraft:smelting',
+      'minecraft:smoking',
+      'minecraft:blasting',
+      'minecraft:campfire_cooking',
+      'minecraft:stonecutting'
+    )
+);
