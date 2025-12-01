@@ -99,6 +99,77 @@ INSERT INTO recipe (
     )
 );
 
+DROP TABLE IF EXISTS ingredient_intermediate;
+CREATE TEMP TABLE ingredient_intermediate AS (
+    SELECT name AS recipe, jt.*
+    FROM recipes_json, JSON_TABLE(json, '$.ingredients[*]' COLUMNS (
+        position FOR ORDINALITY,
+        item_or_tag JSON PATH '$'
+    )) as jt
+    WHERE json ->> 'type' = 'minecraft:crafting_shapeless'
+    UNION ALL
+    SELECT name AS recipe, 1 as position, json -> 'ingredient' AS item_or_tag
+    FROM recipes_json
+    WHERE json ->> 'type' IN (
+        'minecraft:smelting',
+        'minecraft:smoking',
+        'minecraft:blasting',
+        'minecraft:campfire_cooking',
+        'minecraft:stonecutting'
+    )
+    UNION ALL
+    SELECT name AS recipe, position, json -> key AS item_or_tag
+    FROM recipes_json
+    CROSS JOIN (VALUES (1, 'input'), (2, 'material')) AS x (position, key)
+    WHERE json ->> 'type' = 'minecraft:crafting_transmute'
+    UNION ALL
+    (
+        WITH coords(coord) AS (VALUES (0), (1), (2))
+        SELECT
+            name AS recipe,
+            (cy.coord*3 + cx.coord + 1) AS position,
+            json -> 'key' -> (
+                substring(
+                    (json -> 'pattern' ->> cy.coord)
+                    FROM (cx.coord+1) FOR 1
+                )
+            ) AS item_or_tag
+        FROM recipes_json, coords AS cy, coords AS cx
+        WHERE json ->> 'type' = 'minecraft:crafting_shaped'
+    )
+);
+
+  -- sometimes, an ingredient is a list instead of a tag,
+  -- so we must create synthetic tags in this case.
+DROP TABLE IF EXISTS ingredient_lists;
+CREATE TEMP TABLE ingredient_lists (
+    id SERIAL,
+    list JSONB
+);
+INSERT INTO ingredient_lists (list) (
+    SELECT DISTINCT (item_or_tag::jsonb)
+    FROM ingredient_intermediate
+    WHERE item_or_tag IS JSON ARRAY
+);
+INSERT INTO tag (
+    SELECT '#synthetic:' || id
+    FROM ingredient_lists
+);
+INSERT INTO item_tag (
+    SELECT item, ('#synthetic:' || id) as tag
+    FROM ingredient_lists, JSON_TABLE(list, '$[*]' COLUMNS(
+        item TEXT PATH '$'
+    ))
+);
+UPDATE ingredient_intermediate
+    SET item_or_tag = json_scalar('#synthetic:' || id)
+    FROM ingredient_lists
+    WHERE item_or_tag::jsonb = ingredient_lists.list;
+ALTER TABLE ingredient_intermediate
+    ALTER COLUMN item_or_tag
+    TYPE TEXT
+    USING item_or_tag #>> '{}';
+
   -- create ingredient table
 DROP TABLE IF EXISTS recipe_ingredient;
 CREATE TABLE recipe_ingredient (
@@ -109,44 +180,6 @@ CREATE TABLE recipe_ingredient (
     PRIMARY KEY (recipe, position),
     CHECK ((item IS NOT NULL AND tag IS NULL) OR (item IS NULL AND tag IS NOT NULL))
 );
-WITH ingredient_intermediate AS (
-    SELECT name AS recipe, jt.*
-    FROM recipes_json, JSON_TABLE(json, '$.ingredients[*]' COLUMNS (
-        position FOR ORDINALITY,
-        item_or_tag TEXT PATH '$'
-    )) as jt
-    WHERE json ->> 'type' = 'minecraft:crafting_shapeless'
-    UNION ALL
-    SELECT name AS recipe, 1 as position, json ->> 'ingredient' AS item_or_tag
-    FROM recipes_json
-    WHERE json ->> 'type' IN (
-        'minecraft:smelting',
-        'minecraft:smoking',
-        'minecraft:blasting',
-        'minecraft:campfire_cooking',
-        'minecraft:stonecutting'
-    )
-    UNION ALL
-    SELECT name AS recipe, position, json ->> key AS item_or_tag
-    FROM recipes_json
-    CROSS JOIN (VALUES (1, 'input'), (2, 'material')) AS x (position, key)
-    WHERE json ->> 'type' = 'minecraft:crafting_transmute'
-    UNION ALL
-    (
-        WITH coords(coord) AS (VALUES (0), (1), (2))
-        SELECT
-            name AS recipe,
-            (cy.coord*3 + cx.coord + 1) AS position,
-            json -> 'key' ->> (
-                substring(
-                    (json -> 'pattern' ->> cy.coord)
-                    FROM (cx.coord+1) FOR 1
-                )
-            ) AS item_or_tag
-        FROM recipes_json, coords AS cy, coords AS cx
-        WHERE json ->> 'type' = 'minecraft:crafting_shaped'
-    )
-)
 INSERT INTO recipe_ingredient (
     SELECT recipe, position, NULL, item_or_tag
     FROM ingredient_intermediate
