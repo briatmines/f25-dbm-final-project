@@ -189,3 +189,18 @@ INSERT INTO recipe_ingredient (
     FROM ingredient_intermediate
     WHERE item_or_tag NOT LIKE '#%'
 );
+
+
+  -- create item table
+DROP TABLE IF EXISTS item CASCADE;
+CREATE TABLE item (id TEXT PRIMARY KEY);
+INSERT INTO item (
+    SELECT DISTINCT item FROM item_tag WHERE item IS NOT NULL
+    UNION DISTINCT
+    SELECT DISTINCT result_item AS item FROM recipe
+    UNION DISTINCT
+    SELECT DISTINCT item FROM recipe_ingredient WHERE item IS NOT NULL
+);
+ALTER TABLE item_tag ADD FOREIGN KEY (item) REFERENCES item(id);
+ALTER TABLE recipe ADD FOREIGN KEY (result_item) REFERENCES item(id);
+ALTER TABLE recipe_ingredient ADD FOREIGN KEY (item) REFERENCES item(id);
