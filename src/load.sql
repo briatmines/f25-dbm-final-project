@@ -114,6 +114,21 @@ WITH ingredient_intermediate AS (
         item_or_tag TEXT PATH '$'
     )) as jt
     WHERE json ->> 'type' = 'minecraft:crafting_shapeless'
+    UNION ALL
+    SELECT name AS recipe, 1 as position, json ->> 'ingredient' AS item_or_tag
+    FROM recipes_json
+    WHERE json ->> 'type' IN (
+        'minecraft:smelting',
+        'minecraft:smoking',
+        'minecraft:blasting',
+        'minecraft:campfire_cooking',
+        'minecraft:stonecutting'
+    )
+    UNION ALL
+    SELECT name AS recipe, position, json ->> key AS item_or_tag
+    FROM recipes_json
+    CROSS JOIN (VALUES (1, 'input'), (2, 'material')) AS x (position, key)
+    WHERE json ->> 'type' = 'minecraft:crafting_transmute'
 )
 INSERT INTO recipe_ingredient (
     SELECT recipe, position, NULL, item_or_tag
