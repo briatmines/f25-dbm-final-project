@@ -131,6 +131,21 @@ WITH ingredient_intermediate AS (
     FROM recipes_json
     CROSS JOIN (VALUES (1, 'input'), (2, 'material')) AS x (position, key)
     WHERE json ->> 'type' = 'minecraft:crafting_transmute'
+    UNION ALL
+    (
+        WITH coords(coord) AS (VALUES (0), (1), (2))
+        SELECT
+            name AS recipe,
+            (cy.coord*3 + cx.coord + 1) AS position,
+            json -> 'key' ->> (
+                substring(
+                    (json -> 'pattern' ->> cy.coord)
+                    FROM (cx.coord+1) FOR 1
+                )
+            ) AS item_or_tag
+        FROM recipes_json, coords AS cy, coords AS cx
+        WHERE json ->> 'type' = 'minecraft:crafting_shaped'
+    )
 )
 INSERT INTO recipe_ingredient (
     SELECT recipe, position, NULL, item_or_tag
