@@ -225,7 +225,17 @@ def curse(stdscr, cur):
 def main():
     parser = argparse.ArgumentParser(
         prog = 'recipe-browse.py',
-        description = 'Browse and plan Minecraft recipes'
+        description = 'Browse and plan Minecraft recipes',
+        epilog = '''
+key bindings:
+  J, K, Up, Down       --    navigate list
+  Space, Enter, Return --    unravel or collapse node
+  H, L, Left, Right    --    cycle recipe or tag item
+  S                    --    split or unsplit tag or item
+  R                    --    swap focus between plan and summary
+  Q                    --    quit
+        '''.strip(),
+        formatter_class = argparse.RawDescriptionHelpFormatter
     );
     parser.add_argument('-l', '--local',
         help='connect to local PostgreSQL db',
