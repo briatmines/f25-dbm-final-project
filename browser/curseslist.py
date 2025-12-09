@@ -48,7 +48,7 @@ class List:
             else:
                 item.input(input)
             self.items = list(self.root)
-    def draw(self, window):
+    def draw(self, window, focused):
         height, _ = window.getmaxyx()
         self.scroll_to(height, self.cursor)
         window.clear()
@@ -57,7 +57,7 @@ class List:
         ):
             form = (
                 curses.A_REVERSE
-                if i + self.scroll == self.cursor
+                if i + self.scroll == self.cursor and focused
                 else curses.A_NORMAL
             )
             window.addstr(i, 2 * level, item.get_title(), form)
@@ -68,15 +68,19 @@ class ListItem:
         self.children = None
     def toggle(self):
         self.expanded = not self.expanded
+    def input(self, input):
+        pass
     def get_children(self):
         return []
+    def update_children(self):
+        if self.children is None:
+            self.children = self.get_children()
     def get_title(self):
         return self.title
     def __iter__(self):
         yield (0, self)
         if self.expanded:
-            if self.children is None:
-                self.children = self.get_children()
+            self.update_children()
             for child in self.children:
                 for (level, item) in child:
                     yield (level + 1, item)
