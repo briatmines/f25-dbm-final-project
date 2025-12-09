@@ -46,4 +46,10 @@ COPY (
     FROM tag
 ) TO STDOUT WITH (FORMAT TEXT);
 
+\o 'item.json';
+COPY (
+    SELECT json_agg(id)
+    FROM item
+) TO STDOUT WITH (FORMAT TEXT);
+
 \o
