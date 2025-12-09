@@ -3,10 +3,9 @@ const cnv = document.querySelector('#cnv');
 const W = cnv.width;
 const H = cnv.height;
 const R = 5;
-const K = 0.00001;
-const MU = 0.001;
+const K = 0.0002;
 const Q = 0.00000001;
-const G = Q * 1000;
+const G = 0.00001;
 const TAU = 2 * Math.PI;
 
 const ctx = cnv.getContext('2d');
@@ -87,6 +86,31 @@ function draw_frame(delta_t) {
         ctx.stroke();
     }
 
+    // hovered orb highlight
+    let closest_orb;
+    let closest_orb_dist_sq = Infinity;
+    for (const [id, {x, y}] of orbs) {
+        const dx = mouse_x - x;
+        const dy = mouse_y - y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < closest_orb_dist_sq) {
+            closest_orb = id;
+            closest_orb_dist_sq = d2;
+        }
+    }
+
+    ctx.fillStyle = "white";
+    if (closest_orb_dist_sq <= 0.001) {
+        const {x, y} = orbs.get(closest_orb);
+        ctx.beginPath();
+        ctx.ellipse(
+            (x + 0.5) * W / 2, (y + 0.5) * H / 2,
+            1.5 * R, 1.5 * R,
+            0,
+            0, TAU);
+        ctx.fill();
+    }
+
     // draw orbs
     ctx.fillStyle = "black";
     for (const [id, {type, x, y}] of orbs) {
@@ -103,34 +127,29 @@ function draw_frame(delta_t) {
     sim(delta_t);
 }
 
+let elapsed_t = 0;
 function sim(delta_t) {
+    elapsed_t += delta_t;
+    // ramp friction over time
+    const MU = Math.min(0.00083 * Math.exp(0.000059 * elapsed_t), 1);
+
     // orb-local-accelerations
     const orb_arr = Array.from(orbs.values());
     for (const orb of orbs.values()) {
         orb.ax = 0;
         orb.ay = 0;
 
+        // friction
         orb.ax -= MU * orb.vx;
         orb.ay -= MU * orb.vy;
 
-        for (let i = 0; i < 100; ++i) {
+        // random acts of repulsion
+        for (let i = 0; i < 200; ++i) {
             const repel_orb = orb_arr[Math.floor(orb_arr.length * Math.random())];
-            const dx = orb.x - repel_orb.x;
-            const dy = orb.y - repel_orb.y;
-            const d2 = dx * dx + dy * dy;
-            
-            if (d2 < 1E-8) continue;
-            
-            if (Number.isNaN(dx) || Number.isNaN(dy) || Number.isNaN(d2) || d2 == 0) {
-                console.log(orb_arr, repel_orb);
-                console.log(dx, dy, d2);
-                throw 1;
-            }
-
-            orb.ax += Q * dx / d2;
-            orb.ay += Q * dy / d2;
+            repel(orb, repel_orb);
         }
 
+        // "gravity"
         const dcx = orb.x - 0.5;
         const dcy = orb.y - 0.5;
         const dc2 = dcx * dcx + dcy * dcy;
@@ -143,14 +162,7 @@ function sim(delta_t) {
         const start_orb = orbs.get(start);
         const end_orb   = orbs.get(end);
 
-        const {x: sx, y: sy} = start_orb;
-        const {x: ex, y: ey} = end_orb;
-
-        start_orb.ax += K * (ex - sx);
-        start_orb.ay += K * (ey - sy);
-
-        end_orb.ax += K * (sx - ex);
-        end_orb.ay += K * (sy - ey);
+        sproing(start_orb, end_orb);
     }
 
     // update orbs
@@ -161,6 +173,49 @@ function sim(delta_t) {
         orb.x += orb.vx;
         orb.y += orb.vy;
     }
+
+    let max_v_sq = -Infinity;
+    for (const {vx, vy} of orbs.values()) {
+        const v_sq = vx * vx + vy * vy;
+        if (max_v_sq < v_sq) max_v_sq = v_sq;
+    }
+    if (max_v_sq < 1E-7) {
+        pretty_pass();
+        throw "Stop looping"; // this is silly, but works
+    }
+}
+
+function repel(orb1, orb2) {
+    const dx = orb1.x - orb2.x;
+    const dy = orb1.y - orb2.y;
+    const d3 = Math.hypot(dx, dy) ** 3;
+
+    if (d3 < 1E-8) return;
+
+    const rax = Q * dx / d3;
+    const ray = Q * dy / d3;
+
+    orb1.ax += rax;
+    orb1.ay += ray;
+    orb2.ax -= rax;
+    orb2.ay -= ray;
+}
+
+function sproing(start_orb, end_orb) {
+    const {x: sx, y: sy} = start_orb;
+    const {x: ex, y: ey} = end_orb;
+
+    start_orb.ax += K * (ex - sx);
+    start_orb.ay += K * (ey - sy);
+
+    end_orb.ax += K * (sx - ex);
+    end_orb.ay += K * (sy - ey);
+
+    repel(start_orb, end_orb);
+}
+
+function pretty_pass() {
+    // TODO
 }
 
 let prev_t;
@@ -175,3 +230,11 @@ function draw_loop(t) {
 }
 
 draw_loop(0);
+
+let mouse_x = 0;
+let mouse_y = 0;
+
+cnv.addEventListener("mousemove", (e) => {
+    mouse_x = e.offsetX * 2 / W - 0.5;
+    mouse_y = e.offsetY * 2 / H - 0.5;
+});
