@@ -1,6 +1,6 @@
 \documentclass[11pt]{article}
 
-\usepackage{hyperref}
+\usepackage[linkcolor=blue,urlcolor=blue,colorlinks=true]{hyperref}
 \usepackage[margin=1in]{geometry}
 
 \title{\textbf{Project Report}}
@@ -18,14 +18,14 @@
 For our final project, we decided to build, analyze, and visualize a tool
 to facilitate easier user interaction with the crafting recipes in
 \href{https://en.wikipedia.org/wiki/Minecraft}{Minecraft}.
-In order to accomplish this, we created an PostgreSQL script that processes
+In order to accomplish this, we created a PostgreSQL script that processes
 the recipe data in the game's built-in format (JSON) and produces a normalized
 relational database. Using this database, we built an application with which
 a user may create a plan for a Minecraft project and determine which resources
 are needed to create all necessary items. Additionally, we created a
 visualization in the form of a graph which contains the relationships
 between every recipe\footnote{There are some pathological cases which are
-too strange to include} and all relevant items.
+too strange to include.} and their relevant items.
 
 \section{Dataset --- Interrelated Tables}
 
@@ -41,9 +41,10 @@ tables used for data integrity purposes, three substantially interesting
 tables: \texttt{recipe}, \texttt{recipe\_ingredient}, and \texttt{item\_tag}.
 The \texttt{recipe} table (1422 rows) represents each recipe in the game; the
 \texttt{recipe\_ingredient} table (5083 rows) represents each item in each recipe,
-including metadata about the item's usage, and the \texttt{item\_tag} table (2828 rows)
+including metadata about the item's usage; the \texttt{item\_tag} table (2828 rows)
 represents the game's ability to use classes of items instead of individual
-items in recipes.
+items in recipes. We believe this is a sufficiently complex and interesting dataset
+for this project.
 
 \section{Application --- Software Development}
 
@@ -56,8 +57,8 @@ items in recipes.
 Minecraft stores its recipes as a large collection of JSON files. Each file represents
 a single recipe in the game, and may come in one of a variety of formats.
 Recipes typically include an input section and an output section. The output section
-takes on a mostly consistent format, but the input section differs dramatically depending
-on the ``type'' of the recipe.
+takes on a mostly consistent format (including the number and identity of the produced item),
+but the input section differs dramatically depending on the ``type'' of the recipe.
 
 \noindent The most well-known recipe type is the ``shaped crafting`` recipe. Here, input
 items are placed in particular cells of a grid. Recipe files of this type contain a \texttt{key}
@@ -76,8 +77,8 @@ and we do not include these in this project.
 
 \subsubsection{Data Cleaning}
 
-We start by putting all JSON records into two files in CSV format (using \texttt{src/mk-csv.sh}). This is the extent
-of processing done outside SQL. From here, at the request of our instructor, we proceed
+We start by putting all JSON records into two files in CSV format (using \texttt{src/mk-csv.sh}), with
+one CSV row per JSON file. This is the extent of processing done outside SQL. From here, at the request of our instructor, we proceed
 with data processing entirely in SQL. The CSV files are loaded into staging tables and SQL
 JSON operators are used to gradually munge the data into a usable format (using \texttt{src/load.sql}).
 
