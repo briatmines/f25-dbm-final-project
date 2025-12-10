@@ -1,2 +1,5 @@
 mc-assets
 mc-data
+*.aux
+*.log
+*.out

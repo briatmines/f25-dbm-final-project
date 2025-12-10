@@ -2,12 +2,11 @@
 
 \usepackage[linkcolor=blue,urlcolor=blue,colorlinks=true]{hyperref}
 \usepackage[margin=1in]{geometry}
+\usepackage[skip=10pt plus 1pt,indent=0pt]{parskip}
 
 \title{\textbf{Project Report}}
 \author{Logan Gill, Brielle Hoff}
-\date{}
-
-\addtolength{\textheight}{3cm}
+\date{2025-12-10}
 
 \begin{document}
 
@@ -36,7 +35,7 @@ To the extent required by law, all copyrighted data is copyright Mojang AB.
 The visualization and application presented in this report were produced with data from
 Minecraft 1.21.10, but our script works with some earlier versions.
 
-\noindent The dataset that we constructed contains, in addition to several mostly-trivial
+The dataset that we constructed contains, in addition to several mostly-trivial
 tables used for data integrity purposes, three substantially interesting
 tables: \texttt{recipe}, \texttt{recipe\_ingredient}, and \texttt{item\_tag}.
 The \texttt{recipe} table (1422 rows) represents each recipe in the game; the
@@ -60,19 +59,19 @@ Recipes typically include an input section and an output section. The output sec
 takes on a mostly consistent format (including the number and identity of the produced item),
 but the input section differs dramatically depending on the ``type'' of the recipe.
 
-\noindent The most well-known recipe type is the ``shaped crafting`` recipe. Here, input
+The most well-known recipe type is the ``shaped crafting`` recipe. Here, input
 items are placed in particular cells of a grid. Recipe files of this type contain a \texttt{key}
 attribute, which maps ASCII characters to items or tags, and a \texttt{pattern} attribute,
 which contains an array of strings forming a keyed representation of the recipe in ASCII art.
 
-\noindent Many other recipes are ``shapeless``, meaning items may be placed in any order.
+Many other recipes are ``shapeless``, meaning items may be placed in any order.
 The input format is correspondingly simple, providing a flat array of ingredients.
 
-\noindent Our database includes 6 other recipe types for things like cooking or breaking
+Our database includes 6 other recipe types for things like cooking or breaking
 down items at various workstations. Recipes of these types map a single input to a single output,
 but with slightly different formats.
 
-\noindent A few additional recipe types exist, but mostly represent special cases in the game's code,
+A few additional recipe types exist, but mostly represent special cases in the game's code,
 and we do not include these in this project.
 
 \subsubsection{Data Cleaning}
@@ -82,7 +81,7 @@ one CSV row per JSON file. This is the extent of processing done outside SQL. Fr
 with data processing entirely in SQL. The CSV files are loaded into staging tables and SQL
 JSON operators are used to gradually munge the data into a usable format (using \texttt{src/load.sql}).
 
-\noindent While a few tables are trivial to build, some require more complex processing.
+While a few tables are trivial to build, some require more complex processing.
 A recursive CTE was required to expand tags (tags may contain other tags hierarchically
 with arbitrary depth). Additionally, some recipes eschew the tag system and store ingredients
 as arrays of items where an item or tag would normally be expected. We address this problem
