@@ -3,6 +3,7 @@
 \usepackage[linkcolor=blue,urlcolor=blue,colorlinks=true]{hyperref}
 \usepackage[margin=1in]{geometry}
 \usepackage[skip=10pt plus 1pt,indent=0pt]{parskip}
+\usepackage{graphicx}
 
 \title{\textbf{Project Report}}
 \author{Logan Gill, Brielle Hoff}
@@ -93,6 +94,35 @@ some lateral thinking.
 \subsection{Database Schema Design}
 
 \subsection{Data Visualization}
+
+In order to visualize this recipe data we wrote a program which
+performs a physics-like simulation to untangle a graph of the data into
+recognizable structures (see \texttt{visualizer/}).
+
+To use it, first run \texttt{export.sql} to pull the data out of the
+database into a couple of flat JSON files (still in our normalized
+format) spin up a simple http server (e.g. with
+\texttt{python3 -m http.server}) and then navigate to
+\texttt{/visualize.html} (Requires a fairly powerful computer and a
+relatively modern browser).
+
+The output of that program looks something like this:
+(N.B. the randomness in the program means the exact graph is different
+each time)
+
+\begin{center}
+\includegraphics[width=10cm]{./full-graph-small.png}
+
+\includegraphics[width=10cm]{./subgraph.png}
+
+Fig 1. The complete visualization and a cropped portion to show detail.
+\end{center}
+
+In this graph, blue circle nodes represent items, red teardrop nodes
+recipes (with the direction pointing at the recipe's output, and green
+diamond nodes tags.
+The thickness of edges is proportional to the number of items involved.
+
 
 \subsection{Software Development}
 
