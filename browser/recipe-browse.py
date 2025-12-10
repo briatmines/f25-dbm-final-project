@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import curses, curses.textpad
+import re
 import string
 import getpass
 import psycopg
@@ -14,6 +15,67 @@ class Colors:
     ITEM = 2
     TAG = 5
     RECIPE = 4
+    TYPE = 3
+
+def dialog(question):
+    margin = 4
+    dims = (6, curses.COLS - margin * 2)
+    outer = curses.newwin(*dims, 3, margin)
+    curses.textpad.rectangle(outer, 0, 0, dims[0]-2, dims[1]-1)
+    outer.addstr(1, 1, question)
+    outer.addstr(3, 1, '>')
+    outer.refresh()
+    inner = curses.newwin(1, dims[1]-4, 6, margin + 3)
+    box = curses.textpad.Textbox(inner)
+    box.edit()
+    return box.gather()
+
+def ask_split(item, count):
+    english = units.to_minecraft(count)
+    split = dialog(f'Split {count} ({english}) {item} at:')
+    try:
+        split = int(split)
+        if split > 0 and split < count:
+            return split
+    except:
+        pass
+
+def edit_plan(name, value = None):
+    margin = 2
+    dims = (curses.LINES - margin * 2, curses.COLS - margin * 2)
+    outer = curses.newwin(*dims, margin, margin)
+    curses.textpad.rectangle(outer, 0, 0, dims[0]-2, dims[1]-1)
+    outer.addstr(1, 1, f'Editing list of items for plan "{name}"')
+    outer.addstr(2, 1, "Each line is of the form '<amount> <item>'")
+    outer.addstr(3, 1, f'  {'-'*(dims[1]-6)}  ')
+    outer.refresh()
+    inner = curses.newwin(dims[0]-6, dims[1]-2, margin + 4, margin + 1)
+    box = curses.textpad.Textbox(inner)
+    box.edit()
+    plan = box.gather()
+    def parse_item(line):
+        line = line.strip()
+        total = 0
+        running = 1
+        item = ''
+        for word in line.split(' '):
+            try:
+                num = int(word)
+                total += running
+                running = num
+            except:
+                if ':' in word:
+                    item = word
+                elif re.match('.*c.*s.*b.*', word):
+                    running *= 27 * 27 * 64
+                elif re.match('.*s.*b.*', word):
+                    running *= 27 * 64
+                elif re.match('.*s.*', word):
+                    running *= 64
+        total += running
+        if item and total:
+            return (item, total)
+    return [*filter(bool, map(parse_item, plan.split('\n')))]
 
 class MinecraftNode(ListItem):
     def get_ingredients(self):
@@ -58,9 +120,9 @@ class ItemRecipeNode(ChooserNode):
             return '(no recipes)'
         id, type, _ = recipe
         text = [
-            (id, curses.color_pair(Colors.ITEM)),
+            (id, curses.color_pair(Colors.RECIPE)),
             (' via ', 0),
-            (type, curses.color_pair(Colors.RECIPE)),
+            (type, curses.color_pair(Colors.TYPE)),
         ]
         if len(self.choices) == 1:
             return [('[', 0), *text, (']', 0)]
@@ -122,26 +184,6 @@ class TagChooseItemNode(ChooserNode):
             return []
         return [ ItemOrTagNode(self.cur, item, self.count) ]
 
-def ask_split(item, count):
-    margin = 4
-    dims = (6, curses.COLS - margin * 2)
-    outer = curses.newwin(*dims, 3, margin)
-    curses.textpad.rectangle(outer, 0, 0, dims[0]-2, dims[1]-1)
-    english = units.to_minecraft(count)
-    outer.addstr(1, 1, f'Split {count} ({english}) {item} at:')
-    outer.addstr(3, 1, '>')
-    outer.refresh()
-    inner = curses.newwin(1, dims[1]-4, 6, margin + 3)
-    box = curses.textpad.Textbox(inner)
-    box.edit()
-    split = box.gather()
-    try:
-        split = int(split)
-        if split > 0 and split < count:
-            return split
-    except:
-        pass
-
 class ItemOrTagNode(MinecraftNode):
     def __init__(self, cur, item, count):
         super().__init__()
@@ -183,6 +225,24 @@ class ItemOrTagNode(MinecraftNode):
             return ([(self.item, self.count)], [])
         return super().get_ingredients()
 
+class PlanNode(MinecraftNode):
+    def __init__(self, cur, name):
+        super().__init__()
+        self.cur = cur
+        self.name = name
+        cur.execute('''
+            SELECT item, count FROM plan_items
+            WHERE plan = %s
+            ORDER BY item
+        ''', (name,))
+        self.items = cur.fetchall()
+        self.title = f'Plan "{name}"'
+    def get_children(self):
+        return [
+            ItemOrTagNode(self.cur, item, count)
+            for item, count in self.items
+        ]
+
 def collapse(requirements):
     items = {}
     for item, count in requirements:
@@ -222,18 +282,23 @@ class RequirementsNode(ListItem):
             ItemListNode('Leftover items', self.leftover)
         ]
 
-def curse(stdscr, cur):
+def curse(stdscr, cur, plan = None):
     curses.use_default_colors()
     for i in range(0, curses.COLORS):
         curses.init_pair(i+1, i, -1)
     split = curses.LINES * 2 // 3
     pane_top = curses.newwin(split, curses.COLS, 0, 0)
-    pane_bot = curses.newwin(curses.LINES-split, curses.COLS, split, 0)
+    pane_bot = curses.newwin(curses.LINES-split-1, curses.COLS, split+1, 0)
 
-    items = List(ItemOrTagNode(cur, 'minecraft:sticky_piston', 100))
+    if plan is None:
+        plan = dialog('Plan to open:').strip()
+
+    def update_list():
+        return List(PlanNode(cur, plan))
+    items = update_list()
     def update_reqs():
         return List(RequirementsNode(
-            '<plan>',
+            plan,
             *map(collapse, items.root.get_ingredients())
         ))
     reqs = update_reqs()
@@ -247,8 +312,45 @@ def curse(stdscr, cur):
         input = Input.from_key(key) or key
         if input == Input.QUIT:
             break
-        if input == 'r':
+        elif input == 'r':
             focus = 1-focus
+        # due to time constraints, loading and storing
+        # plans is very basic and does not do much checking.
+        # this can be improved in a later version
+        elif input == 'p':
+            plan = dialog('Name for new plan:').strip()
+            ings = edit_plan(plan)
+            ingredients = collapse(ings).items()
+            cur.execute('''
+                INSERT INTO plan (name)
+                VALUES (%s)
+            ''', (plan,))
+            cur.executemany('''
+                INSERT INTO plan_items (plan, count, item)
+                VALUES (%s, %s, %s)
+            ''', [
+                (plan, count, item)
+                for item, count in ingredients
+            ])
+            items = update_list()
+        elif input == 'e':
+            ingredients = collapse(edit_plan(plan)).items()
+            if ingredients:
+                cur.execute('''
+                    DELETE FROM plan_items
+                    WHERE plan = %s
+                ''', (plan,))
+                cur.executemany('''
+                    INSERT INTO plan_items (plan, count, item)
+                    VALUES (%s, %s, %s)
+                ''', [
+                    (plan, count, item)
+                    for item, count in ingredients
+                ])
+                items = update_list()
+        elif input == 'o':
+            plan = dialog('Open plan:').strip()
+            items = update_list()
 
         if focus == 0:
             items.input(pane_top, input)
@@ -276,6 +378,9 @@ key bindings:
   S                    --    split or unsplit tag or item
   R                    --    swap focus between plan and summary
   Q                    --    quit
+  P                    --    create a new plan
+  E                    --    edit the current plan
+  O                    --    open a plan
         '''.strip(),
         formatter_class = argparse.RawDescriptionHelpFormatter
     );
@@ -286,25 +391,28 @@ key bindings:
         help='database name or url')
     parser.add_argument('-u', '--user',
         help='database username')
-    parser.add_argument('--password',
+    parser.add_argument('-P', '--password',
         help='database password')
+    parser.add_argument('-p', '--plan',
+        help='plan to open')
     args = parser.parse_args()
 
     if args.local or args.dbname and ('://' not in args.dbname):
         dbname = args.dbname or input('Database name: ')
         conn = 'dbname='+dbname
-        args = {}
+        dbargs = {}
         schema = 'minecraft_recipes'
     else:
         user = args.user or input('User: ')
         password = args.password or getpass.getpass()
         conn = args.dbname or 'postgresql://ada.mines.edu/csci403'
-        args = {'user':user, 'password':password}
+        dbargs = {'user':user, 'password':password}
         schema = user
-    with psycopg.connect(conn, **args) as conn:
+    with psycopg.connect(conn, **dbargs) as conn:
         with conn.cursor() as cur:
             cur.execute(f'SET search_path TO {schema};')
-            curses.wrapper(curse, cur)
+            curses.wrapper(curse, cur, plan = args.plan)
+        conn.commit()
 
 if __name__ == '__main__':
     main()
