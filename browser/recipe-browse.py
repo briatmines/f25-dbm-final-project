@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import curses
+import curses, curses.textpad
+import string
 import getpass
 import psycopg
 import argparse
@@ -8,6 +9,11 @@ import collections
 
 from curseslist import *
 import units
+
+class Colors:
+    ITEM = 2
+    TAG = 5
+    RECIPE = 4
 
 class MinecraftNode(ListItem):
     def get_ingredients(self):
@@ -51,10 +57,15 @@ class ItemRecipeNode(ChooserNode):
         if recipe is None:
             return '(no recipes)'
         id, type, _ = recipe
+        text = [
+            (id, curses.color_pair(Colors.ITEM)),
+            (' via ', 0),
+            (type, curses.color_pair(Colors.RECIPE)),
+        ]
         if len(self.choices) == 1:
-            return f'[{id} via {type}]'
+            return [('[', 0), *text, (']', 0)]
         else:
-            return f'< [{id} via {type}] >'
+            return [('< [', 0), *text, ('] >', 0)]
     def get_children(self):
         recipe = self.get_chosen()
         if recipe is None:
@@ -100,15 +111,36 @@ class TagChooseItemNode(ChooserNode):
         item = self.get_chosen()
         if item is None:
             return '(no items)'
+        text = [(item, curses.color_pair(Colors.ITEM))]
         if len(self.choices) == 1:
-            return f'{item}'
+            return text
         else:
-            return f'< {item} >'
+            return [('< ', 0), *text, (' >', 0)]
     def get_children(self):
         item = self.get_chosen()
         if item is None:
             return []
         return [ ItemOrTagNode(self.cur, item, self.count) ]
+
+def ask_split(item, count):
+    margin = 4
+    dims = (6, curses.COLS - margin * 2)
+    outer = curses.newwin(*dims, 3, margin)
+    curses.textpad.rectangle(outer, 0, 0, dims[0]-2, dims[1]-1)
+    english = units.to_minecraft(count)
+    outer.addstr(1, 1, f'Split {count} ({english}) {item} at:')
+    outer.addstr(3, 1, '>')
+    outer.refresh()
+    inner = curses.newwin(1, dims[1]-4, 6, margin + 3)
+    box = curses.textpad.Textbox(inner)
+    box.edit()
+    split = box.gather()
+    try:
+        split = int(split)
+        if split > 0 and split < count:
+            return split
+    except:
+        pass
 
 class ItemOrTagNode(MinecraftNode):
     def __init__(self, cur, item, count):
@@ -117,7 +149,12 @@ class ItemOrTagNode(MinecraftNode):
         self.item = item
         self.count = count
         english = units.to_minecraft(count)
-        self.title = f'{count} ({english}) {item}'
+        self.title = [
+            (f'{count} ({english}) ', 0),
+            (f'{item}', curses.color_pair(
+                Colors.TAG if item.startswith('#') else Colors.ITEM
+            ))
+        ]
         self.split = None
     def input(self, input):
         if input == 's':
@@ -125,8 +162,10 @@ class ItemOrTagNode(MinecraftNode):
                 self.split = None
             else:
                 # todo - ask where to split
-                self.split = [self.count//2, self.count-self.count//2]
-                self.expanded = True
+                where = ask_split(self.item, self.count)
+                if where:
+                    self.split = [where, self.count-where]
+                    self.expanded = True
             self.children = None
     def get_children(self):
         if self.split:
@@ -184,6 +223,9 @@ class RequirementsNode(ListItem):
         ]
 
 def curse(stdscr, cur):
+    curses.use_default_colors()
+    for i in range(0, curses.COLORS):
+        curses.init_pair(i+1, i, -1)
     split = curses.LINES * 2 // 3
     pane_top = curses.newwin(split, curses.COLS, 0, 0)
     pane_bot = curses.newwin(curses.LINES-split, curses.COLS, split, 0)
@@ -203,7 +245,7 @@ def curse(stdscr, cur):
     while True:
         key = stdscr.getkey()
         input = Input.from_key(key) or key
-        if input == 'q':
+        if input == Input.QUIT:
             break
         if input == 'r':
             focus = 1-focus
@@ -229,7 +271,7 @@ def main():
         epilog = '''
 key bindings:
   J, K, Up, Down       --    navigate list
-  Space, Enter, Return --    unravel or collapse node
+  Space, Enter, Return --    expand or collapse item tree
   H, L, Left, Right    --    cycle recipe or tag item
   S                    --    split or unsplit tag or item
   R                    --    swap focus between plan and summary

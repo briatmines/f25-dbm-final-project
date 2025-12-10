@@ -6,17 +6,20 @@ class Input:
     LEFT = 'LEFT'
     RIGHT = 'RIGHT'
     SELECT = 'SELECT'
+    QUIT = 'QUIT'
     def from_key(letter):
-        if letter in ('k', curses.KEY_UP):
+        if letter in ('k', 'KEY_UP'):
             return Input.UP
-        elif letter in ('j', curses.KEY_DOWN):
+        elif letter in ('j', 'KEY_DOWN'):
             return Input.DOWN
-        elif letter in ('h', curses.KEY_LEFT):
+        elif letter in ('h', 'KEY_LEFT'):
             return Input.LEFT
-        elif letter in ('l', curses.KEY_RIGHT):
+        elif letter in ('l', 'KEY_RIGHT'):
             return Input.RIGHT
-        elif letter in (curses.KEY_ENTER, ' ', '\n'):
+        elif letter in ('KEY_ENTER', ' ', '\n'):
             return Input.SELECT
+        elif letter in ('q',):
+            return Input.QUIT
 
 class List:
     def __init__(self, root):
@@ -60,7 +63,15 @@ class List:
                 if i + self.scroll == self.cursor and focused
                 else curses.A_NORMAL
             )
-            window.addstr(i, 2 * level, item.get_title(), form)
+            title = item.get_title()
+            if type(title) is str:
+                window.addstr(i, 2 * level, item.get_title(), form)
+            else:
+                parts = iter(title)
+                text, attr = next(parts)
+                window.addstr(i, 2 * level, text, form | attr)
+                for text, attr in parts:
+                    window.addstr(text, form | attr)
 
 class ListItem:
     def __init__(self):
