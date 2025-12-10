@@ -1,5 +1,10 @@
 const cnv = document.querySelector('#cnv');
 
+const P_BG_CLR     = "#bae7f9";
+const P_ITEM_CLR   = "#6346e2";
+const P_TAG_CLR    = "#53e246";
+const P_RECIPE_CLR = "#e24646";
+
 const W = cnv.width;
 const H = cnv.height;
 const R = 5;
@@ -215,7 +220,170 @@ function sproing(start_orb, end_orb) {
 }
 
 function pretty_pass() {
-    // TODO
+    // background
+    ctx.fillStyle = P_BG_CLR;
+    ctx.fillRect(0, 0, W, H);
+
+    function q_interpolate(t, {x: x1, y: y1}, {x: x2, y: y2}, {x: x3, y: y3}) {
+        const a = 1 - 3 * t + 2 * t * t;
+        const b = 4 * t - 4 * t * t;
+        const c = -t + 2 * t * t;
+        return {
+            x: a * x1 + b * x2 + c * x3,
+            y: a * y1 + b * y2 + c * y3,
+        };
+    }
+
+    // draw recipes
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const [id, {ingredients, result: {id: result_id, count: result_count}}] of recipes) {
+        const ingredient_stack = new Map();
+        for (const {position, item, tag} of ingredients) {
+            const id = item != null ? `item{${item}}` : `tag{${tag}}`;
+            ingredient_stack.set(
+                id,
+                (ingredient_stack.get(id) ?? 0) + 1
+            );
+        }
+
+        const {x: recipe_x, y: recipe_y} = orbs.get(`recipe{${id}}`);
+        const {x: result_x, y: result_y} = orbs.get(`item{${result_id}}`);
+
+        for (const [ingredient_id, count] of ingredient_stack) {
+            const {x: ix, y: iy} = orbs.get(ingredient_id);
+
+            ctx.lineWidth = count * R / 10;
+            ctx.beginPath();
+            ctx.moveTo((ix + 0.5) * W / 2, (iy + 0.5) * H / 2);
+            for (let t = 0; t <= 0.5; t += 0.5 / 16) {
+                const {x, y} = q_interpolate(
+                    t,
+                    {x: ix, y: iy},
+                    {x: recipe_x, y: recipe_y},
+                    {x: result_x, y: result_y},
+                );
+                ctx.lineTo((x + 0.5) * W / 2, (y + 0.5) * H / 2);
+            }
+            ctx.stroke();
+        }
+
+        let ingredient_mean_x = 0;
+        let ingredient_mean_y = 0;
+        let ingredient_count = 0;
+        for (const [ingredient_id, count] of ingredient_stack) {
+            const {x, y} = orbs.get(ingredient_id);
+            ingredient_mean_x += x * count;
+            ingredient_mean_y += y * count;
+            ingredient_count += count;
+        }
+        ingredient_mean_x /= ingredient_count;
+        ingredient_mean_y /= ingredient_count;
+
+        let dx = recipe_x;
+        let dy = recipe_y;
+        let d  = Infinity;
+
+        ctx.lineWidth = result_count * R / 10;
+        ctx.beginPath();
+        ctx.moveTo(
+            (recipe_x + 0.5) * W / 2,
+            (recipe_y + 0.5) * H / 2
+        );
+        for (let t = 0.5; t <= 1; t += 0.5 / 16) {
+            const {x, y} = q_interpolate(
+                t,
+                {x: ingredient_mean_x, y: ingredient_mean_y},
+                {x: recipe_x, y: recipe_y},
+                {x: result_x, y: result_y},
+            );
+            ctx.lineTo((x + 0.5) * W / 2, (y + 0.5) * H / 2);
+
+            const p_dx = (x - recipe_x) * W / 2;
+            const p_dy = (y - recipe_y) * H / 2;
+            const p_d  = Math.abs(Math.hypot(p_dx, p_dy) - 4 * R);
+            if (p_d < d) {
+                dx = p_dx;
+                dy = p_dy;
+                d  = p_d;
+            }
+        }
+        ctx.stroke();
+
+        orbs.get(`recipe{${id}}`).alpha = Math.atan2(dy, dx);
+    }
+
+    // draw tags
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 3 * R / 5;
+    ctx.setLineDash([4 * R, 2 * R]);
+    for (const [tag, {items}] of tags) {
+        const {x: tx, y: ty} = orbs.get(`tag{${tag}}`);
+        for (const item of items) {
+            const {x: ix, y: iy} = orbs.get(`item{${item}}`);
+
+            ctx.beginPath();
+            ctx.moveTo((ix + 0.5) * W / 2, (iy + 0.5) * H / 2);
+            ctx.lineTo((tx + 0.5) * W / 2, (ty + 0.5) * H / 2);
+            ctx.stroke();
+        }
+    }
+
+    // draw orbs
+    ctx.fillStyle   = "white";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = R;
+    ctx.setLineDash([]);
+    for (const [id, {type, x, y, alpha}] of orbs) {
+        const adj_x = (x + 0.5) * W / 2;
+        const adj_y = (y + 0.5) * H / 2;
+
+        ctx.beginPath();
+        switch (type) {
+            case 'recipe': {
+                // console.log(alpha);
+                ctx.fillStyle = P_RECIPE_CLR;
+                ctx.moveTo(
+                    adj_x + 2 * R * Math.cos(alpha - TAU / 6),
+                    adj_y + 2 * R * Math.sin(alpha - TAU / 6)
+                );
+                ctx.ellipse(
+                    adj_x, adj_y,
+                    2 * R, 2 * R,
+                    0,
+                    alpha - TAU / 6, alpha + TAU / 6,
+                    true
+                );
+                ctx.lineTo(
+                    adj_x + 4 * R * Math.cos(alpha),
+                    adj_y + 4 * R * Math.sin(alpha)
+                );
+                ctx.closePath();
+            }; break;
+            case 'item': {
+                ctx.fillStyle = P_ITEM_CLR;
+                ctx.ellipse(
+                    adj_x, adj_y,
+                    2 * R, 2 * R,
+                    0,
+                    0, TAU
+                );
+            }; break;
+            case 'tag': {
+                ctx.fillStyle = P_TAG_CLR;
+                ctx.moveTo(adj_x + 3 * R, adj_y        );
+                ctx.lineTo(adj_x,         adj_y + 3 * R);
+                ctx.lineTo(adj_x - 3 * R, adj_y        );
+                ctx.lineTo(adj_x,         adj_y - 3 * R);
+                ctx.closePath();
+            }; break;
+        }
+        ctx.stroke();
+        ctx.fill();
+    }
 }
 
 let prev_t;
