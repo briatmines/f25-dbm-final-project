@@ -1,0 +1,40 @@
+graph ER {
+	graph[start=1]
+	edge [len=1.25]
+
+	fontname="Helvetica,Arial,sans-serif"
+	node [fontname="Helvetica,Arial,sans-serif"]
+	edge [fontname="Helvetica,Arial,sans-serif"]
+	layout=neato
+	node [shape=box]; item; recipe; tag;
+	node [shape=ellipse]; count; category; type; group; position;
+		{node [label=<<u>id</u>>] item_id; recipe_id; tag_id;}
+	node [shape=diamond,style=filled,color=lightgrey]; has; output;
+		{node [label="input"] input_item; input_tag;}
+
+	item -- has;
+	tag -- has;
+
+	item -- output [label=1];
+	recipe -- output;
+
+	item -- input_item;
+	recipe -- input_item;
+	tag -- input_tag;
+	recipe -- input_tag;
+	
+	output -- count;
+	input_item -- position;
+	input_tag -- position;
+
+	recipe -- category;
+	recipe -- type;
+	recipe -- group;
+
+	item -- item_id;
+	recipe -- recipe_id;
+	tag -- tag_id;
+
+	# label = "\n\nEntity Relation Diagram\ndrawn by NEATO";
+	fontsize=20;
+}

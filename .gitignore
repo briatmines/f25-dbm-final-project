@@ -1,3 +1,6 @@
 mc-assets
 mc-data
 */__pycache__
+*.aux
+*.log
+*.out
