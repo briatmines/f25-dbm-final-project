@@ -4,6 +4,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage[skip=10pt plus 1pt,indent=0pt]{parskip}
 \usepackage{graphicx}
+\usepackage{listings}
 
 \title{\textbf{Project Report}}
 \author{Logan Gill, Brielle Hoff}
@@ -41,12 +42,37 @@ tables used for data integrity purposes, three substantially interesting
 tables: \texttt{recipe}, \texttt{recipe\_ingredient}, and \texttt{item\_tag}.
 The \texttt{recipe} table (1422 rows) represents each recipe in the game; the
 \texttt{recipe\_ingredient} table (5083 rows) represents each item in each recipe,
-including metadata about the item's usage; the \texttt{item\_tag} table (2828 rows)
+including metadata about the item's usage (such as placement location); the \texttt{item\_tag} table (2828 rows)
 represents the game's ability to use classes of items instead of individual
 items in recipes. We believe this is a sufficiently complex and interesting dataset
 for this project.
 
 \section{Application --- Software Development}
+
+After constructing the dataset, we created a TUI application with which the recipe tree
+may be explored interactively. The application may be found in the \texttt{browser/} folder of our project repository.
+It is written using \texttt{psycopg}, a Python PostgreSQL database adapter, and uses
+\texttt{curses}, a built-in Python ibrary for writing terminal applications (and a wrapper
+around the C library of the same name). It can connect to either the course database or a
+local PostgreSQL server containing the extracted data.
+
+Using this application, the user may create and edit "plans" containing a set of Minecraft items
+and quantities, and can then explore the space of ways to craft that set of items.
+For example, one might create a plan for an in-game house, which would consist of
+all of the block types present in the build (wood, brick, etc.) along with the total number of each one used.
+The application would then present a tree structure with a node for each item.
+Any item may be left as-is, if the user already posesses enough of that item, or expanded so that a recipe
+(if available) to produce that item may be selected. Upon selection, the recipe would then expand to its constituent items.
+This process may be repeated, hierarchically, as needed.
+Required total quantities are tracked throughout. Items may also be split into multiple
+identical nodes whose count sum to that of the original, which is useful if the user
+wants to be able to acquire an item through a combination of recipes. After each change to the tree,
+the application updates a list of the base items (corresponding to leaf nodes of the tree),
+as well as items that will be left over after crafting the set. This could be very useful to
+Minecraft players who need to know what resources to gather in what quantities in order to
+successfully build their ideas.
+
+Once created, user plans can be saved to the database for further exploration at a later date.
 
 \section{Outputs}
 
@@ -125,6 +151,39 @@ The thickness of edges is proportional to the number of items involved.
 
 
 \subsection{Software Development}
+
+As mentioned earlier in this report, the source code for our application can be found in our
+\href{https://github.com/briatmines/f25-dbm-final-project}{project repository}.
+
+\begin{center}
+\includegraphics[width=10cm]{./browser-demo.png}
+
+Fig 2. A demo of the TUI application in action. This user already possesses 3 \texttt{minecraft:cherry\_planks},
+so they created a split node,
+and has now discovered that they need to farm 45 \texttt{minecraft:bamboo}
+in order to complete this build.
+\end{center}
+
+Most tree nodes make database queries when expanded for the first time.
+Making queries lazily like this ensures that the application only stores what it needs to
+and is reactive as possible.
+
+For example, the following code is used when a node representing a recipe is expanded to show its input items.
+
+\begin{lstlisting}
+self.cur.execute('''
+    SELECT item, tag
+    FROM recipe_ingredient
+    WHERE recipe = %s
+    ORDER BY position
+''', (id,))
+self.ingredients = self.cur.fetchall()
+\end{lstlisting}
+
+Similar code is used in other tree nodes to fetch the required data as needed.
+Additionally, the ``planning'' functionality uses similarly simple SQL commands
+to insert, modify, and query the tables used to store user-created item lists.
+Parameterization is used throughout the program to reduce the risk of SQL injection.
 
 \section{Conclusion}
 
