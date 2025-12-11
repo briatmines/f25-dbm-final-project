@@ -4,7 +4,6 @@
 \usepackage[margin=1in]{geometry}
 \usepackage[skip=10pt plus 1pt,indent=0pt]{parskip}
 \usepackage{graphicx}
-\usepackage{listings}
 
 \title{\textbf{Project Report}}
 \author{Logan Gill, Brielle Hoff}
@@ -122,6 +121,28 @@ is likely used to make recipes easily human-editable) to our internal format req
 some lateral thinking.
 
 \subsection{Database Schema Design}
+
+\includegraphics[width=10cm]{./er-diagram.png}
+
+One of our first tasks of the project was planning our database schema.
+There are three primary entity types here, as illustrated above: items, recipes, and tags.
+These relationships are many-to-many in general, so the edge labels are omitted for brevity.
+Items are related to tags (a tag can contain any number of items and an item can belong
+to any number of tags); recipes always have a single output item (with a quantity) and
+a number of positioned inputs which can be items or tags; and recipes have various attributes
+which are used by the game and shown for informational purposes in the application
+(category, type, and group). We generate a few additional single-column
+tables which serve as enumerations for certain attributes. For example, there is a \texttt{recipe\_group}
+table which the \texttt{recipe\_group} attribute on the \texttt{recipe} table references as a foreign key.
+The same applies to recipe categories. Most other key constraints are fairly self-explanatory
+given the entity relationships.
+
+We chose to do quite a bit of normalization here. This increased the complexity of the data loading step,
+but made future processing and application development much easier. For example, native tags are allowed
+to reference other tags, but we chose to flatten these relationships while building the table. This has
+practical implications, as applications can find all items in a tag with one query; without such flattening,
+the tag entity would have a relationship to itself and applications would likely be doing a lot of repeated
+work without much benefit.
 
 \subsection{Data Visualization}
 
